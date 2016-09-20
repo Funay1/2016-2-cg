@@ -1,9 +1,0 @@
-<aplicacao>
-	<janela>
-		<largura>500</largura>
-		<altura>500</altura>
-		<fundo corR="1" corG="1" corB="1"></fundo>
-		<titulo>Meu quadrado que arrasta</titulo>
-	</janela>
-	<quadrado tamanho="250" corR="1" corG="1" corB="0"></quadrado>
-</aplicacao>
