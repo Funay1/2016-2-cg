@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1">
+  <circle
+     cx="500"
+     cy="500"
+     r="300"
+     fill="blue"
+     id="Pista" />
+  <circle
+     cx="500"
+     cy="500"
+     r="150"
+     fill="white"
+     id="Pista" />
+  <rect
+     x="654"
+     y="476"
+     width="136"
+     height="45"
+     fill="black"
+     id="LargadaChegada" />
+  <circle
+     cx="552"
+     cy="296"
+     r="20"
+     fill="red"
+     id="Inimigo" />
+  <circle
+     cx="257"
+     cy="578"
+     r="20"
+     fill="red"
+     id="Inimigo" />
+  <circle
+     cx="626"
+     cy="702"
+     r="20"
+     fill="red"
+     id="Inimigo" />
+  <circle
+     cx="717"
+     cy="501"
+     r="20"
+     id="Jogador"
+     fill="green" />
+</svg>
