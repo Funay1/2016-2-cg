@@ -21,12 +21,18 @@ class Point {
 	public:
 		double x;
 		double y;
+
 		Point(double a, double b){
 			x = a;
 			y = b;
 		}
+
 		double distance(Point *p2){
 			return sqrt(pow((this->x - p2->x), 2) + pow((this->y - p2->y), 2));
+		}
+
+		void invert(float win_size)	{
+			this->y = win_size - this->y;
 		}
 };
 
@@ -167,8 +173,8 @@ class Rect : public Shape {
 				glColor3f(this->fill->R, this->fill->G, this->fill->B);
 				glVertex2f(this->center->x, this->center->y);
 				glVertex2f(this->center->x + this->width, this->center->y);
-				glVertex2f(this->center->x + this->width, this->center->y + this->height);
-				glVertex2f(this->center->x, this->center->y + this->height);
+				glVertex2f(this->center->x + this->width, this->center->y - this->height);
+				glVertex2f(this->center->x, this->center->y - this->height);
 			glEnd();
 	}
 };
@@ -297,6 +303,15 @@ void parserSVG(const char* svg_img) {
 		arena[1] = tmp;
 	}
 
+	float win_size = 2*arena[0]->radius;
+
+	arena[0]->center->invert(win_size);
+	arena[1]->center->invert(win_size);
+	for (std::vector<Shape*>::const_iterator i = scenario.begin(); i != scenario.end(); ++i)
+		(*i)->center->invert(win_size);
+	largada->center->invert(win_size);
+	player->center->invert(win_size);
+
 	return;
 }
 
@@ -319,7 +334,7 @@ void display() {
 int main(int argc, char** argv) {
 		parserXML (argv[1]);
 		string file = svg_path + svg_name + "." +svg_ext;
-
+		cout << file << endl;
 		if(file[0] == '~') {
 			file.erase(0,1);
 			struct passwd *pw = getpwuid(getuid());
@@ -328,20 +343,20 @@ int main(int argc, char** argv) {
 		}
 		parserSVG (file.c_str());
 
-		glutInit(&argc, argv);													 // Initialize GLUT
-		glutInitWindowSize(2*arena[0]->radius, 2*arena[0]->radius);	                 // Set the window's initial width & height
-		glutInitWindowPosition(arena[0]->center->x, arena[0]->center->y);								// Position the window's initial top-left corner
-		glutCreateWindow("Jogo");							          // Create window with the given title
+		glutInit(&argc, argv);													                            // Initialize GLUT
+		glutInitWindowSize(2*arena[0]->radius, 2*arena[0]->radius);	                // Set the window's initial width & height
+		glutInitWindowPosition(arena[0]->center->x, arena[0]->center->y);						// Position the window's initial top-left corner
+		glutCreateWindow("Jogo");							                                      // Create window with the given title
 		gluOrtho2D(arena[0]->center->x - arena[0]->radius,
 			arena[0]->center->x + arena[0]->radius,
-			arena[0]->center->x - arena[0]->radius,
-			arena[0]->center->x + arena[0]->radius);		                // Set clipping area's left, right, bottom, top
-		glMatrixMode(GL_PROJECTION);										// Select the Projection matrix for operation
-		glLoadIdentity();																// Reset Projection matrix
-		glutDisplayFunc(display);												// Register display callback handler for window re-paint
+			arena[0]->center->y - arena[0]->radius,
+			arena[0]->center->y + arena[0]->radius);                            // Set clipping area's left, right, bottom, top
+		glMatrixMode(GL_PROJECTION);										                            // Select the Projection matrix for operation
+		glLoadIdentity();																                            // Reset Projection matrix
+		glutDisplayFunc(display);												                            // Register display callback handler for window re-paint
 		glutKeyboardFunc(keypressed);
 		glutKeyboardUpFunc(keyunpressed);
 		glutIdleFunc(idle);
-		glutMainLoop();																	// Enter the event-processing loop
+		glutMainLoop();																	                            // Enter the event-processing loop
 		return 0;
 }
