@@ -5,6 +5,9 @@
 #include <cstring>
 #include <math.h>
 #include <vector>
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include <GL/glut.h>	// GLUT, includes glu.h and gl.h
 #include "tinyxml2.h"
@@ -227,7 +230,9 @@ void parserXML(const char* path) {
 
 	string file = string(path);
 	file = file + "config.xml";
+
 	const char* filename = file.c_str();
+
 	xml_doc.LoadFile(filename);
 
 	XMLNode * pRoot = xml_doc.FirstChild();
@@ -314,6 +319,13 @@ void display() {
 int main(int argc, char** argv) {
 		parserXML (argv[1]);
 		string file = svg_path + svg_name + "." +svg_ext;
+
+		if(file[0] == '~') {
+			file.erase(0,1);
+			struct passwd *pw = getpwuid(getuid());
+			string homedir = string(pw->pw_dir);
+		  file = homedir + file;
+		}
 		parserSVG (file.c_str());
 
 		glutInit(&argc, argv);													 // Initialize GLUT
