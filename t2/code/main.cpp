@@ -235,7 +235,7 @@ void parserXML(const char* path) {
 	XMLDocument xml_doc;
 
 	string file = string(path);
-	file = file + "config.xml";
+	file = file + "/config.xml";
 
 	const char* filename = file.c_str();
 
@@ -334,7 +334,6 @@ void display() {
 int main(int argc, char** argv) {
 		parserXML (argv[1]);
 		string file = svg_path + svg_name + "." +svg_ext;
-		cout << file << endl;
 		if(file[0] == '~') {
 			file.erase(0,1);
 			struct passwd *pw = getpwuid(getuid());
