@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cmath>
 #include <vector>
+#include <sstream>
 
 #include <GL/glut.h> // GLUT, includes glu.h and gl.h
 #include "tinyxml2.h"
@@ -13,7 +14,6 @@ using namespace std;
 using namespace tinyxml2;
 
 #define PI 3.1415927
-#define TIME 30;
 
 class Point {
 public:
@@ -25,6 +25,12 @@ Point(double a,
         y = b;
 }
 
+string toString(){
+        ostringstream convert;
+        convert << x << ", " << y;
+        return convert.str();
+}
+
 double distance(Point *p2) {
         return sqrt(pow((this->x - p2->x), 2) + pow((this->y - p2->y), 2));
 }
@@ -33,9 +39,9 @@ void invert(float win_size) {
         this->y = win_size - this->y;
 }
 
-void add(Point *center) {
-        this->x = this->x + center->x;
-        this->y = this->y + center->y;
+void add(Point *point) {
+        this->x = this->x + point->x;
+        this->y = this->y + point->y;
 }
 };
 
@@ -89,21 +95,16 @@ Color(string color) {
 }
 };
 
-enum Type { circle, rectangle };
-
 class Shape {
 public:
 
 string id;
-Type type;
 Point *center;
 Color *fill;
 Shape(string i,
-      Type t,
       Point *c,
       Color *f) {
         id     = i;
-        type   = t;
         center = c;
         fill   = f;
 }
@@ -122,12 +123,11 @@ double radius;
 double start;
 double end;
 Circle(string i,
-       Type t,
        Point *c,
        Color *f,
        float r,
        double start,
-       double end ) : Shape(i, t, c, f) {
+       double end ) : Shape(i, c, f) {
         this->radius = r;
         this->start  = start;
         this->end  = end;
@@ -181,7 +181,8 @@ bool colide(vector<Shape *>s) {
  */
 void draw() const {
         int i;
-        int triangleAmount = 60; // # of triangles used to draw circle
+        // # of triangles used to draw circle
+        int triangleAmount = 60;
         // GLfloat radius = 0.8f; //radius
         GLfloat twicePi = 2.0f * PI;
 
@@ -206,11 +207,10 @@ public:
 double height;
 double width;
 Rect(string i,
-     Type t,
      Point *c,
      Color *f,
      double w,
-     double h) : Shape(i, t, c, f) {
+     double h) : Shape(i, c, f) {
         width  = w;
         height = h;
 }
@@ -218,11 +218,46 @@ Rect(string i,
 void draw(void) const {
         glBegin(GL_QUADS);
         glColor3f(this->fill->R, this->fill->G, this->fill->B);
-        glVertex2f(this->center->x,               this->center->y);
+        glVertex2f(this->center->x, this->center->y);
         glVertex2f(this->center->x + this->width, this->center->y);
-        glVertex2f(this->center->x + this->width, this->center->y + this->height);
-        glVertex2f(this->center->x,               this->center->y + this->height);
+        glVertex2f(this->center->x + this->width, this->center->y - this->height);
+        glVertex2f(this->center->x, this->center->y - this->height);
         glEnd();
+}
+};
+
+
+class Shot {
+public:
+Rect* formato;
+double attitute;
+
+Shot(Rect* formato, Point *position, double angle_cannon) {
+        this->formato = new Rect("shot",
+                                 new Point(position->x, position->y),
+                                 new Color("red"),
+                                 formato->width,
+                                 formato->height);
+        this->attitute = angle_cannon;
+}
+
+void draw(Point *window_center, double window_size, double ratio) {
+        glPushMatrix();
+        glTranslatef(-(window_center->x - this->formato->center->x)/window_size,
+                     -(window_center->y - this->formato->center->y - this->formato->height*ratio/2)/window_size,
+                     0);
+        glRotatef(this->attitute, 0,0,1);
+        glScalef(ratio, ratio, 0);
+        glTranslatef((window_center->x - this->formato->center->x)/window_size,
+                     (window_center->y - this->formato->center->y - this->formato->height*ratio/2)/window_size,
+                     0);
+        formato->draw();
+        glPopMatrix();
+}
+
+void kinematics(double t, double speed_shot){
+        this->formato->center->x += t*(speed_shot*cos((this->attitute - 90)*PI/180));
+        this->formato->center->y += t*(speed_shot*sin((this->attitute - 90)*PI/180));
 }
 };
 
@@ -233,6 +268,7 @@ vector<Shape *> shapes;
 vector<Rect *> steps;
 
 /* Needed for ajusts */
+Point  *center;
 Point  *position;
 Point  *window_center;
 double window_size;
@@ -240,42 +276,68 @@ double window_size;
 /* Needed for kinematics */
 Point  *axis_back_center;
 Circle *body;
+Circle *colisor;
 double d;
 double angle_body;
 double angle_wheel;
 double speed_car;
-double speed_shoot;
+double speed_current;
+Rect   *cannon;
+double angle_cannon;
+double speed_shot;
 double ratio;
+double size_step;
+double ref_step;
+int counter;
 
-void draw() const {
-        glTranslatef((this->position->x - axis_back_center->x)/window_size,
-                     (this->position->y - axis_back_center->y)/window_size,
+void draw(vector<Shot *> shots) const {
+        glPushMatrix();
+        glTranslatef((this->position->x - this->axis_back_center->x)/this->window_size,
+                     (this->position->y - this->axis_back_center->y)/this->window_size,
                      0);
-        glTranslatef(-(this->window_center->x - axis_back_center->x)/window_size,
-                     -(this->window_center->y - axis_back_center->y)/window_size,
+        glTranslatef(-(this->window_center->x - this->axis_back_center->x)/this->window_size,
+                     -(this->window_center->y - this->axis_back_center->y)/this->window_size,
                      0);
-        glScalef(this->ratio, this->ratio, 0);
         glRotatef(this->angle_body, 0,0,1);
-        glTranslatef((this->window_center->x - axis_back_center->x)/window_size,
-                     (this->window_center->y - axis_back_center->y)/window_size,
+        glScalef(this->ratio, this->ratio, 0);
+        glTranslatef((this->window_center->x - this->axis_back_center->x)/this->window_size,
+                     (this->window_center->y - this->axis_back_center->y)/this->window_size,
                      0);
         for (std::vector<Shape *>::const_iterator i = this->shapes.begin();
              i != this->shapes.end(); ++i) {
                 (*i)->draw();
         }
 
+        glPushMatrix();
+        glTranslatef(-(this->window_center->x - this->center->x)/this->window_size,
+                     -(this->window_center->y - this->center->y)/this->window_size,
+                     0);
+        glRotatef(this->angle_cannon, 0,0,1);
+        glTranslatef((this->window_center->x - this->center->x)/this->window_size,
+                     (this->window_center->y - this->center->y)/this->window_size,
+                     0);
+        this->cannon->draw();
+        glPopMatrix();
+
+        /* Draw the 2 wheels. To do that, it is needed to move to the center of the screen and then move to the next point */
         for (std::vector<Rect *>::const_iterator i = this->steps.begin();
              i != this->steps.end(); ++i) {
                 glPushMatrix();
-                glTranslatef(-(window_center->x - (*i)->center->x - (*i)->width/2)/window_size,
-                             -(window_center->y - (*i)->center->y - (*i)->height/2)/window_size,
+                glTranslatef(-(window_center->x - ((*i)->center->x + (*i)->width/2))/this->window_size,
+                             -(window_center->y - ((*i)->center->y - (*i)->height/2))/this->window_size,
                              0);
                 glRotatef(angle_wheel, 0,0,1);
-                glTranslatef((window_center->x - (*i)->center->x - (*i)->width/2)/window_size,
-                             (window_center->y - (*i)->center->y - (*i)->height/2)/window_size,
+                glTranslatef((window_center->x - ((*i)->center->x + (*i)->width/2))/this->window_size,
+                             (window_center->y - ((*i)->center->y - (*i)->height/2))/this->window_size,
                              0);
                 (*i)->draw();
                 glPopMatrix();
+        }
+        glPopMatrix();
+
+        for (std::vector<Shot *>::const_iterator i = shots.begin();
+             i != shots.end(); ++i) {
+                (*i)->draw(this->window_center, this->window_size, this->ratio);
         }
 }
 
@@ -285,22 +347,40 @@ void modify_angle_wheel(double value){
 }
 
 void kinematics(double t, vector<Shape *> scenario, Circle *arena[2]){
-        this->position->x = t*(this->speed_car*cos((angle_body - 90)*PI/180)) + this->position->x;
-        this->position->y = t*(this->speed_car*sin((angle_body - 90)*PI/180)) + this->position->y;
-        this->angle_body  = t*(this->speed_car*tan((this->angle_wheel)*PI/180)) + this->angle_body;
-        if (!this->body->colide(scenario) || !this->body->colide(arena[1]) || this->body->inside(arena[0])) {
-                this->position->x = this->position->x - t*(this->speed_car*cos((angle_body - 90)*PI/180));
-                this->position->y =this->position->y -  t*(this->speed_car*sin((angle_body - 90)*PI/180));
+        /* Based on the model of a car-like vehicle, we calculate the moviment and in the case of a colision, it undo it */
+        this->position->x = t*(this->speed_current*cos((angle_body - 90)*PI/180)) + this->position->x;
+        this->colisor->center->x = this->position->x + cos((angle_body - 90)*PI/180)*this->d*(this->ratio)/2;
+        if (!this->colisor->colide(scenario) || !this->colisor->colide(arena[1]) || this->colisor->inside(arena[0]))
+                this->position->x = this->position->x - t*(this->speed_current*cos((angle_body - 90)*PI/180));
+
+        this->position->y = t*(this->speed_current*sin((angle_body - 90)*PI/180)) + this->position->y;
+        this->colisor->center->y = this->position->y + sin((angle_body - 90)*PI/180)*this->d*(this->ratio)/2;
+        if (!this->colisor->colide(scenario) || !this->colisor->colide(arena[1]) || this->colisor->inside(arena[0]))
+                this->position->y = this->position->y -  t*(this->speed_current*sin((angle_body - 90)*PI/180));
+
+        this->angle_body  = t*(this->speed_current*tan((this->angle_wheel)*PI/180)) + this->angle_body;
+        if (!this->colisor->colide(scenario) || !this->colisor->colide(arena[1]) || this->colisor->inside(arena[0]))
+                this->angle_body  = this->angle_body - t*(this->speed_current*tan((this->angle_wheel)*PI/180));
+
+        for (std::vector<Shape *>::const_iterator i = this->shapes.begin();
+             i != this->shapes.end(); ++i) {
+                if((*i)->id == "strip" && this->speed_current != 0) {
+                        (*i)->center->y = this->ref_step - this->counter%(int)this->size_step;
+                        this->counter = this->counter%(int)this->size_step;
+                }
         }
+
+
 }
 };
 
 /* Global Variables */
 string svg_name, svg_ext, svg_path;
-GLfloat speed_shoot, speed_car;
+GLfloat speed_shot, speed_car;
 GLfloat gx = 0, gy = 0;
 int keypress[256];
 vector<Shape *> scenario;
+vector<Shot *> shots;
 int counter_arena = 0;
 Circle *arena[2];
 Circle *player;
@@ -315,19 +395,31 @@ void keyunpressed(unsigned char key, int x, int y) {
         keypress[key] = 0;
 }
 
-void mouse(int button, int state, int x, int y) {
-        cout << x << " " << 2*arena[0]->radius - y << endl;
+void mouse(int button, int mouse_state, int x, int y) {
+        if(mouse_state == GLUT_DOWN && button == GLUT_LEFT_BUTTON) {
+                Point *position = new Point(car->colisor->center->x, car->colisor->center->y);
+                shots.push_back(new Shot(car->cannon, position, car->angle_cannon + car->angle_body));
+        }
 }
 
 void idle(void) {
-
-        if ((keypress['w'] == 1) || (keypress['W'] == 1)) ;
-        if ((keypress['s'] == 1) || (keypress['S'] == 1)) ;
+        if(((keypress['w'] == 1) || (keypress['W'] == 1)) && ((keypress['s'] == 1) || (keypress['S'] == 1))) {
+                car->speed_current = 0;
+        }
+        else if ((keypress['w'] == 1) || (keypress['W'] == 1)) {
+                car->speed_current = car->speed_car;
+        }
+        else if ((keypress['s'] == 1) || (keypress['S'] == 1)) {
+                car->speed_current = (-1)*car->speed_car;
+        }
+        else {
+                car->speed_current = 0;
+        }
         if ((keypress['d'] == 1) || (keypress['D'] == 1)) {
-                car->modify_angle_wheel(-1);
+                car->modify_angle_wheel(-0.5);
         }
         if ((keypress['a'] == 1) || (keypress['A'] == 1)) {
-                car->modify_angle_wheel(1);
+                car->modify_angle_wheel(+0.5);
         }
 
         static GLdouble previousTime = 0;
@@ -340,6 +432,11 @@ void idle(void) {
         previousTime = currentTime;    //Update previous time
 
         car->kinematics(timeDiference, scenario, arena);
+
+        for (std::vector<Shot *>::const_iterator i = shots.begin();
+             i != shots.end(); ++i) {
+                (*i)->kinematics(timeDiference, speed_shot);
+        }
 
         glutPostRedisplay();
 }
@@ -367,8 +464,9 @@ void parserXML(const char *path) {
         svg_path = pSVGAttr->Attribute("caminho");
 
         XMLElement *pCarAttr = pRoot->FirstChildElement("carro");
-        pCarAttr->QueryDoubleAttribute("velTiro",  &car->speed_shoot);
+        pCarAttr->QueryDoubleAttribute("velTiro",  &car->speed_shot);
         pCarAttr->QueryDoubleAttribute("velCarro", &car->speed_car);
+        speed_shot = car->speed_shot;
 }
 
 void parserSVG(const char *svg_img) {
@@ -398,19 +496,19 @@ void parserSVG(const char *svg_img) {
                         Point *p = new Point(x, y);
                         obj->QueryDoubleAttribute("height", &height);
                         obj->QueryDoubleAttribute("width", &width);
-                        largada = new Rect(id, rectangle, p, fill, width, height);
+                        largada = new Rect(id, p, fill, width, height);
                 }
                 else if (!id.compare("Jogador")) {
                         obj->QueryDoubleAttribute("r", &r);
-                        player = new Circle(id, circle, p, fill, r, 0, 2*PI);
+                        player = new Circle(id, p, fill, r, 0, 2*PI);
                 }
                 else if (!id.compare("Pista")) {
                         obj->QueryDoubleAttribute("r", &r);
-                        arena[counter_arena++] = new Circle(id, circle, p, fill, r, 0, 2*PI);
+                        arena[counter_arena++] = new Circle(id, p, fill, r, 0, 2*PI);
                 }
                 else if (!id.compare("Inimigo")) {
                         obj->QueryDoubleAttribute("r", &r);
-                        scenario.push_back(new Circle(id, circle, p, fill, r, 0, 2*PI));
+                        scenario.push_back(new Circle(id, p, fill, r, 0, 2*PI));
                 }
 
                 if ((obj = obj->NextSiblingElement()) == NULL) break;
@@ -433,7 +531,6 @@ void parserSVG(const char *svg_img) {
         largada->center->invert(win_size);
         player->center->invert(win_size);
         car->position = player->center;
-
 }
 
 void parserCarSVG(const char *svg_car) {
@@ -446,7 +543,7 @@ void parserCarSVG(const char *svg_car) {
         XMLNode *pRoot  = xml_doc.FirstChild();
         XMLElement *obj = pRoot->FirstChildElement("rect");
 
-        for (int i = 0; i < 14; i++) {
+        for (int i = 0; i < 17; i++) {
                 double cx, cy, r, height, width, x, y;
                 double start, end;
                 string fill_value, id, name;
@@ -457,13 +554,22 @@ void parserCarSVG(const char *svg_car) {
                 id   = obj->Attribute("id");
                 name = string(obj->Name());
 
-                if (id == "right_front" || id == "left_front") {
+                if (id == "cannon") {
                         obj->QueryDoubleAttribute("x", &x);
                         obj->QueryDoubleAttribute("y", &y);
                         Point *p = new Point(x, y);
                         obj->QueryDoubleAttribute("height", &height);
                         obj->QueryDoubleAttribute("width", &width);
-                        s.push_back(new Rect(id, rectangle, p, fill, width, height));
+                        car->cannon = new Rect(id, p, fill, width, height);
+                }
+                else if (id == "right_front" || id == "left_front") {
+                        obj->QueryDoubleAttribute("x", &x);
+                        obj->QueryDoubleAttribute("y", &y);
+                        Point *p = new Point(x, y);
+                        obj->QueryDoubleAttribute("height", &height);
+                        obj->QueryDoubleAttribute("width", &width);
+                        s.push_back(new Rect(id, p, fill, width, height));
+                        car->size_step = height;
                 }
                 else if (name == "rect") {
                         obj->QueryDoubleAttribute("x", &x);
@@ -471,13 +577,7 @@ void parserCarSVG(const char *svg_car) {
                         Point *p = new Point(x, y);
                         obj->QueryDoubleAttribute("height", &height);
                         obj->QueryDoubleAttribute("width", &width);
-                        v.push_back(new Rect(id, rectangle, p, fill, width, height));
-                        if(id == "body1") {
-                                car->axis_back_center = new Point(x + width/2, y + height);
-                        }
-                        else if(id == "front_axis") {
-                                axis_front_center = new Point(x + width/2, y + height/2);
-                        }
+                        v.push_back(new Rect(id, p, fill, width, height));
                 }
                 else if (name == "path") {
                         obj->QueryDoubleAttribute("sodipodi:cx", &cx);
@@ -486,15 +586,30 @@ void parserCarSVG(const char *svg_car) {
                         obj->QueryDoubleAttribute("sodipodi:start", &start);
                         obj->QueryDoubleAttribute("sodipodi:end", &end);
                         Point *p = new Point(cx, cy);
-                        v.push_back(new Circle(id, circle, p, fill, r, start, end));
+                        v.push_back(new Circle(id, p, fill, r, start, end));
                 }
                 else if (name == "circle") {
                         obj->QueryDoubleAttribute("cx", &cx);
                         obj->QueryDoubleAttribute("cy", &cy);
                         obj->QueryDoubleAttribute("r", &r);
                         Point *p = new Point(cx, cy);
-                        v.push_back(new Circle(id, circle, p, fill, r, 0, 2*PI));
+                        v.push_back(new Circle(id, p, fill, r, 0, 2*PI));
+
                 }
+
+                if(id == "body1") {
+                        car->axis_back_center = new Point(x + width/2, y);
+                }
+                else if(id == "front_axis") {
+                        axis_front_center = new Point(x + width/2, y - height/2);
+                }
+                else if(id == "driver") {
+                        car->center = new Point(cx, cy);
+                }
+                else if(id == "strip") {
+                        car->ref_step = y - height;
+                }
+
 
                 if ((obj = obj->NextSiblingElement()) == NULL) {
                         break;
@@ -503,6 +618,7 @@ void parserCarSVG(const char *svg_car) {
 
         car->d  = axis_front_center->distance(car->axis_back_center);
         car->body =  player;
+        car->colisor =  new Circle("colisor", new Point(0,0), new Color("black"), player->radius, 0, 2*PI);
         car->shapes = v;
         car->steps = s;
 
@@ -513,7 +629,8 @@ void parserCarSVG(const char *svg_car) {
         /* Needed for kinematics */
         car->angle_wheel = 0;
         car->angle_body = 180;
-        car->ratio = player->radius/50;
+        car->ratio = player->radius/(car->d);
+        car->counter = 0;
 }
 
 /* Handler for window-repaint event. Call back when the window first appears and
@@ -527,10 +644,20 @@ void display() {
              i != scenario.end(); ++i) {
                 (*i)->draw();
         }
+
         largada->draw();
-        player->draw();
-        car->draw();
+        car->draw(shots);
+        car->counter++;
         glFlush();
+}
+
+void motion(int x, int y) {
+        if(x < arena[0]->radius) {
+                car->angle_cannon = 45*(1 - x/arena[0]->radius);
+        }
+        else {
+                car->angle_cannon = -45*(x/arena[0]->radius - 1);
+        }
 }
 
 /* Main function: GLUT runs as a console application starting at main()	*/
@@ -566,6 +693,7 @@ int main(int argc, char **argv) {
         glutKeyboardFunc(keypressed);
         glutKeyboardUpFunc(keyunpressed);
         glutMouseFunc(mouse);
+        glutPassiveMotionFunc(motion);
         glutIdleFunc(idle);
         glutMainLoop(); // Enter the event-processing loop
         return 0;

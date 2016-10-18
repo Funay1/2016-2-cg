@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1">
-    <rect fill="gainsboro" id="front_axis" width="50" height="2" x="-25" y="53"/>
-    <rect fill="dimgray" id="left_back" width="20" height="20" x="-34" y="90"/>
-    <rect fill="dimgray" id="right_back" width="20" height="20" x="14" y="90"/>
-    <rect fill="dimgray" id="left_front" width="10" height="20" x="-29" y="44"/>
-    <rect fill="dimgray" id="right_front" width="10" height="20" x="19" y="44"/>
-    <rect fill="gainsboro" id="wing_front" width="50" height="10" x="-24" y="39"/>
-    <rect fill="darkred" id="body1" width="20" height="55" x="-10" y="45"/>
+    <rect fill="gainsboro" id="front_axis" width="50" height="2" x="-25" y="55"/>
+    <rect fill="dimgray" id="left_back" width="20" height="20" x="-34" y="110"/>
+    <rect fill="dimgray" id="right_back" width="20" height="20" x="14" y="110"/>
+    <rect fill="dimgray" id="left_front" width="10" height="20" x="-29" y="64"/>
+    <rect fill="dimgray" id="right_front" width="10" height="20" x="19" y="64"/>
+    <rect fill="gainsboro" id="wing_front" width="50" height="10" x="-24" y="49"/>
+    <rect fill="darkred" id="body1" width="20" height="55" x="-10" y="100"/>
     <path
         fill="darkred"
         id="body2"
@@ -19,9 +19,12 @@
         d="m 29.999998,67.445648 a 30,29.999998 0 0 1 -15,25.980761 30,29.999998 0 0 1 -30.000001,-1e-6 30,29.999998 0 0 1 -14.999999,-25.980761 l 30.0000000926514,1e-6 z"
         />
     <circle fill="darkred" id="body3" cx="0" cy="45" r="10"/>
-    <rect fill="gainsboro" id="wing_back" width="50" height="15" x="-24" y="100"/>
-    <rect fill="black" id="spot_driver2" width="15" height="8" x="-7.50" y="65"/>
+    <rect fill="gainsboro" id="wing_back" width="50" height="15" x="-24" y="115"/>
+    <rect fill="black" id="spot_driver2" width="15" height="8" x="-7.50" y="80"/>
     <circle fill="black" id="spot_driver1" cx="0" cy="72.5" r="7.5"/>
     <circle fill="black" id="spot_driver3" cx="0" cy="65" r="7.5"/>
     <circle fill="white" id="driver" cx="0" cy="72.5" r="6"/>
+    <rect fill="white" id="cannon" width="6" height="25" x="-3" y="72.5"/>
+    <rect fill="white" id="strip" width="20" height="5" x="-34" y="115"/>
+    <rect fill="white" id="strip" width="20" height="5" x="14" y="115"/>
 </svg>
