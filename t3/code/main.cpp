@@ -289,7 +289,6 @@ double speed_shot;
 double ratio;
 double size_step;
 double ref_step;
-int counter;
 
 void draw(vector<Shot *> shots) const {
 
@@ -364,15 +363,16 @@ void kinematics(double t, vector<Shape *> scenario, Circle *arena[2]){
         if (!this->colisor->colide(scenario) || !this->colisor->colide(arena[1]) || this->colisor->inside(arena[0]))
                 this->angle_body  = this->angle_body - t*(this->speed_current*tan((this->angle_wheel)*PI/180));
 
+
+        static int counter = 0;
+        counter++;
         for (std::vector<Shape *>::const_iterator i = this->shapes.begin();
              i != this->shapes.end(); ++i) {
                 if((*i)->id == "strip" && this->speed_current != 0) {
-                        (*i)->center->y = this->ref_step - this->counter%(int)this->size_step;
-                        this->counter = this->counter%(int)this->size_step;
+                        (*i)->center->y = this->ref_step - counter%(int)this->size_step;
+                        counter = counter%(int)this->size_step;
                 }
         }
-
-
 }
 };
 
@@ -637,7 +637,6 @@ void parserCarSVG(const char *svg_car) {
         car->angle_wheel = 0;
         car->angle_body = 180;
         car->ratio = player->radius/(car->d);
-        car->counter = 0;
 }
 
 /* Handler for window-repaint event. Call back when the window first appears and
@@ -653,7 +652,6 @@ void display() {
         }
         largada->draw();
         car->draw(shots);
-        car->counter++;
         glutSwapBuffers();
 }
 
