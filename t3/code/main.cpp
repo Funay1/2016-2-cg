@@ -133,14 +133,6 @@ Circle(string i,
         this->end  = end;
 }
 
-void modify_x(float inc) {
-        this->center->x = this->center->x + inc;
-}
-
-void modify_y(float inc) {
-        this->center->y = this->center->y + inc;
-}
-
 bool inside(Shape *s) {
         Circle *c = (Circle *)(s);
 
@@ -152,7 +144,6 @@ bool inside(Shape *s) {
 
 bool colide(Shape *s) {
         Circle *c = (Circle *)(s);
-
         if (this->center->distance(c->center) <= (c->radius + this->radius)) {
                 return false;
         }
@@ -162,7 +153,6 @@ bool colide(Shape *s) {
 bool colide(vector<Shape *>s) {
         for (std::vector<Shape *>::const_iterator i = s.begin(); i != s.end(); ++i) {
                 Circle *c = (Circle *)(*i);
-
                 if (this->center->distance(c->center) <= (c->radius + this->radius)) {
                         return false;
                 }
@@ -202,7 +192,6 @@ void draw() const {
 };
 
 class Rect : public Shape {
-
 public:
 double height;
 double width;
@@ -229,27 +218,27 @@ void draw(void) const {
 
 class Shot {
 public:
-Rect* formato;
+Circle* formato;
 double attitute;
 
-Shot(Rect* formato, Point *position, double angle_cannon) {
-        this->formato = new Rect("shot",
-                                 new Point(position->x, position->y),
-                                 new Color("red"),
-                                 formato->width,
-                                 formato->height);
+Shot(double radius, Point *position, double angle_cannon) {
+        this->formato = new Circle("shot",
+                                   new Point(position->x, position->y),
+                                   new Color("red"),
+                                   radius,
+                                   0,
+                                   2*PI);
         this->attitute = angle_cannon;
 }
 
 void draw(Point *window_center, double window_size, double ratio) {
         glPushMatrix();
         glTranslatef(-(window_center->x - this->formato->center->x)/window_size,
-                     -(window_center->y - this->formato->center->y - this->formato->height*ratio/2)/window_size,
+                     -(window_center->y - this->formato->center->y)/window_size,
                      0);
-        glRotatef(this->attitute, 0,0,1);
         glScalef(ratio, ratio, 0);
         glTranslatef((window_center->x - this->formato->center->x)/window_size,
-                     (window_center->y - this->formato->center->y - this->formato->height*ratio/2)/window_size,
+                     (window_center->y - this->formato->center->y)/window_size,
                      0);
         formato->draw();
         glPopMatrix();
@@ -258,6 +247,18 @@ void draw(Point *window_center, double window_size, double ratio) {
 void kinematics(double t, double speed_shot){
         this->formato->center->x += t*(speed_shot*cos((this->attitute - 90)*PI/180));
         this->formato->center->y += t*(speed_shot*sin((this->attitute - 90)*PI/180));
+}
+};
+
+class Window {
+public:
+Point *center;
+double height;
+double width;
+Window(double x, double y, double height, double width){
+        this->center = new Point(x, y);
+        this->height = height;
+        this->width = width;
 }
 };
 
@@ -280,10 +281,10 @@ Circle *colisor;
 double d;
 double angle_body;
 double angle_wheel;
-double speed_car;
 double speed_current;
 Rect   *cannon;
 double angle_cannon;
+double speed_car;
 double speed_shot;
 double ratio;
 double size_step;
@@ -291,6 +292,7 @@ double ref_step;
 int counter;
 
 void draw(vector<Shot *> shots) const {
+
         glPushMatrix();
         glTranslatef((this->position->x - this->axis_back_center->x)/this->window_size,
                      (this->position->y - this->axis_back_center->y)/this->window_size,
@@ -384,8 +386,9 @@ vector<Shot *> shots;
 int counter_arena = 0;
 Circle *arena[2];
 Circle *player;
-Rect   *largada;
-Car    *car = new Car();
+Rect *largada;
+Window* window;
+Car *car = new Car();
 
 void keypressed(unsigned char key, int x, int y) {
         keypress[key] = 1;
@@ -397,8 +400,10 @@ void keyunpressed(unsigned char key, int x, int y) {
 
 void mouse(int button, int mouse_state, int x, int y) {
         if(mouse_state == GLUT_DOWN && button == GLUT_LEFT_BUTTON) {
-                Point *position = new Point(car->colisor->center->x, car->colisor->center->y);
-                shots.push_back(new Shot(car->cannon, position, car->angle_cannon + car->angle_body));
+                double x = car->colisor->center->x + car->ratio*car->cannon->height*cos((car->angle_cannon + car->angle_body - 90)*PI/180);
+                double y = car->colisor->center->y + car->ratio*car->cannon->height*sin((car->angle_cannon + car->angle_body - 90)*PI/180);
+                Point *position = new Point(x, y);
+                shots.push_back(new Shot(car->cannon->width/2, position, car->angle_cannon + car->angle_body));
         }
 }
 
@@ -416,15 +421,15 @@ void idle(void) {
                 car->speed_current = 0;
         }
         if ((keypress['d'] == 1) || (keypress['D'] == 1)) {
-                car->modify_angle_wheel(-0.5);
+                car->modify_angle_wheel(-5);
         }
         if ((keypress['a'] == 1) || (keypress['A'] == 1)) {
-                car->modify_angle_wheel(+0.5);
+                car->modify_angle_wheel(+5);
         }
 
-        static GLdouble previousTime = 0;
         GLdouble currentTime;
         GLdouble timeDiference;
+        static GLdouble previousTime = 0;
 
         // Elapsed time from the initiation of the game.
         currentTime = glutGet(GLUT_ELAPSED_TIME);
@@ -437,7 +442,6 @@ void idle(void) {
              i != shots.end(); ++i) {
                 (*i)->kinematics(timeDiference, speed_shot);
         }
-
         glutPostRedisplay();
 }
 
@@ -513,6 +517,9 @@ void parserSVG(const char *svg_img) {
 
                 if ((obj = obj->NextSiblingElement()) == NULL) break;
         }
+
+        window = new Window(arena[0]->center->x, arena[0]->center->y,
+                            2*arena[0]->radius, 2*arena[0]->radius);
 
         Circle *tmp;
         if(arena[0]->radius < arena[1]->radius) {
@@ -644,11 +651,10 @@ void display() {
              i != scenario.end(); ++i) {
                 (*i)->draw();
         }
-
         largada->draw();
         car->draw(shots);
         car->counter++;
-        glFlush();
+        glutSwapBuffers();
 }
 
 void motion(int x, int y) {
@@ -656,7 +662,7 @@ void motion(int x, int y) {
                 car->angle_cannon = 45*(1 - x/arena[0]->radius);
         }
         else {
-                car->angle_cannon = -45*(x/arena[0]->radius - 1);
+                car->angle_cannon = 45*(1 - x/arena[0]->radius);
         }
 }
 
@@ -669,6 +675,7 @@ int main(int argc, char **argv) {
         parserCarSVG("car.svg");
         // Initialize GLUT Set the window's initial width & height
         glutInit(&argc, argv);
+        glutInitDisplayMode (GLUT_DOUBLE);
         glutInitWindowSize(2 * arena[0]->radius, 2 * arena[0]->radius);
 
         // Position the window's  initial top-left corner Create window with the given
