@@ -45,11 +45,19 @@ Point* vetor(Point* b){
 }
 
 double angle(){
-        return atan2(this->y, this->x)*(180.0/PI);
+        double angle = atan2(this->y, this->x)*(180.0/PI);
+        if(angle < 0) {
+                return angle + 360;
+        }
+        return angle;
 }
 
 double angle(Point* b){
-        return atan2(b->y - this->y, b->x - this->x)*(180.0/PI);
+        double angle = atan2(b->y - this->y, b->x - this->x)*(180.0/PI);
+        if(angle < 0) {
+                return angle + 360;
+        }
+        return angle;
 }
 
 double distance(Point *p2) {
@@ -408,7 +416,9 @@ double ratio;
 double size_step;
 double ref_step;
 
-Car(Circle* body, list<Shape*> parts){
+double prev_error;
+
+Car(Window* window, Circle* body, list<Shape*> parts){
         Point* axis_front_center;
         list<Shape*> s;
         list<Shape*> new_parts;
@@ -466,8 +476,9 @@ Car(Circle* body, list<Shape*> parts){
         this->parts = new_parts;
         this->steps = s;
         this->angle_wheel = 0;
-        this->angle_body = 180;
+        this->angle_body = this->body->center->vetor(window->center)->angle();
         this->ratio = body->radius/(this->d);
+        this->prev_error = 1;
 }
 
 void draw(Window* window, list<Shot *> shots) const {
@@ -527,9 +538,43 @@ void draw(Window* window, list<Shot *> shots) const {
         }
 }
 
+void set_angle_wheel(double error){
+        if(error > 45) {
+                this->angle_wheel = 45;
+        }
+        else if(error < -45) {
+                this->angle_wheel = -45;
+        }
+        else {
+                this->angle_wheel = error;
+        }
+}
+
+void set_angle_body(double value){
+        if(value < -180) {
+                this->angle_body = value + 360;
+        }
+        else if(value > 180) {
+                this->angle_body =  value - 360;
+        }
+}
+
+double get_angle_body(){
+        if(this->angle_body < 0) {
+                this->angle_body = this->angle_body + 360;
+        }
+        return this->angle_body;
+}
+
 void modify_angle_wheel(double value){
         if(this->angle_wheel + value <= 45 && this->angle_wheel + value >= -45) {
                 this->angle_wheel += value;
+        }
+        else if (value > 0) {
+                this->angle_wheel = 45;
+        }
+        else {
+                this->angle_wheel = -45;
         }
 }
 
@@ -576,9 +621,9 @@ double speed_current;
 double speed_shot;
 
 
-Caracter (Circle* car, list<Shape*> parts, double speed_car, double speed_shot) {
+Caracter (Window* window, Circle* car, list<Shape*> parts, double speed_car, double speed_shot) {
         this->id = car->id.c_str();
-        this->car = new Car(car, parts);
+        this->car = new Car(window, car, parts);
         this->speed_car = speed_car;
         this->speed_shot = speed_shot;
 }
@@ -587,8 +632,8 @@ void modify_speed(double proportion){
         this->speed_current = proportion*this->speed_car;
 }
 
-void modify_angle_wheel(double amount){
-        this->car->modify_angle_wheel(amount);
+void modify_angle_wheel(double value){
+        this->car->modify_angle_wheel(value);
 }
 
 void modify_cannon(Window* window, double x){
@@ -616,16 +661,28 @@ void draw(Window* window){
 
 class AI {
 public:
-static void move_enemy(Window* window, Caracter* player, list<Caracter *> enemies){
-
+static void move_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies){
+        std::cout << std::endl;
+        for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
+                (*i)->modify_speed(1);
+                double error = 0;
+                double prev_error = (*i)->car->prev_error;
+                double set_point = ((*i)->car->body->center->vetor(window->center))->angle(); //NOTE must be (0,360)
+                if(error/prev_error < 0) {
+                        error = 10;
+                }
+                else {
+                        error = set_point - (*i)->car->get_angle_body(); //TODO problem with higher speeds
+                        (*i)->car->prev_error = error;
+                }
+                cout << set_point << " " << (*i)->car->get_angle_body() << " " << error  << " " << prev_error << endl;
+                (*i)->car->modify_angle_wheel(error);
+        }
 }
 
-static void shot_enemy(Window* window, Caracter* player, list<Caracter *> enemies) {
-        cout << endl;
+static void shot_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies) {
         for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
-                (*i)->modify_speed(0);
-                cout << fmod(((*i)->car->body->center->vetor(window->center))->angle(), 45.0) << ((*i)->car->body->center->vetor(window->center))->angle() << endl;
-                //cout <<  (*i)->car->angle_body << endl;
+                //cout << ((*i)->car->body->center->vetor(window->center))->angle() << endl;
                 // double angle = player->car->body->center->vetor((*i)->car->body->center)->angle();
                 // cout << (*i)->car->angle_body<< ": " << angle << endl;
                 // if((*i)->car->angle_body - 90 - angle < 45 || (*i)->car->angle_body - 90 - angle > 315) {
@@ -769,10 +826,10 @@ void parserSVG(const char *svg_img, double speed_car, double speed_shot) {
         for (std::list<Shape*>::const_iterator i = caracters.begin(); i != caracters.end(); ++i) {
                 (*i)->center->invert(win_size);
                 if(!(*i)->id.compare("Jogador")) {
-                        player = new Caracter((Circle*)(*i), parts, speed_car, speed_shot);
+                        player = new Caracter(window, (Circle*)(*i), parts, speed_car, speed_shot);
                 }
                 else {
-                        enemies.push_back(new Caracter((Circle*)(*i), parts, speed_car, speed_shot));
+                        enemies.push_back(new Caracter(window, (Circle*)(*i), parts, speed_car, speed_shot));
                 }
         }
 }
@@ -849,7 +906,8 @@ void idle(void) {
         //Update previous time
         previousTime = currentTime;
 
-        AI::shot_enemy(window, player, enemies);
+        AI::move_enemy(timeDiference, window, player, enemies);
+        AI::shot_enemy(timeDiference, window, player, enemies);
 
         player->kinematics(timeDiference, window, scenario);
         for(list<Caracter*>::const_iterator it = enemies.begin(); it != enemies.end(); it++) {
