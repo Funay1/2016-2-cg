@@ -34,6 +34,10 @@ Point* clone(){
         return new Point(this->x, this->y);
 }
 
+bool equal(Point* p){
+        return (this->x == p->x) && (this->y == p->y);
+}
+
 string toString(){
         ostringstream convert;
         convert << this->x << ", " << this->y;
@@ -416,7 +420,7 @@ double ratio;
 double size_step;
 double ref_step;
 
-double prev_error;
+double i_error;
 
 Car(Window* window, Circle* body, list<Shape*> parts){
         Point* axis_front_center;
@@ -478,7 +482,7 @@ Car(Window* window, Circle* body, list<Shape*> parts){
         this->angle_wheel = 0;
         this->angle_body = this->body->center->vetor(window->center)->angle();
         this->ratio = body->radius/(this->d);
-        this->prev_error = 1;
+        this->i_error = 0;
 }
 
 void draw(Window* window, list<Shot *> shots) const {
@@ -620,12 +624,34 @@ double speed_car;
 double speed_current;
 double speed_shot;
 
+double set_point;
+Point *prev_pos;
+int counter;
+double freq_shot;
+
+int score;
 
 Caracter (Window* window, Circle* car, list<Shape*> parts, double speed_car, double speed_shot) {
         this->id = car->id.c_str();
         this->car = new Car(window, car, parts);
         this->speed_car = speed_car;
         this->speed_shot = speed_shot;
+        this->set_point = car->center->distance(window->center);
+        this->prev_pos = new Point(car->center->x, car->center->y);
+        this->counter = 1;
+        this->score = 0;
+}
+
+Caracter (Window* window, Circle* car, list<Shape*> parts, double speed_car, double speed_shot, double freq_shot) {
+        this->id = car->id.c_str();
+        this->car = new Car(window, car, parts);
+        this->speed_car = speed_car;
+        this->speed_shot = speed_shot;
+        this->set_point = car->center->distance(window->center);
+        this->prev_pos = new Point(car->center->x, car->center->y);
+        this->counter = 1;
+        this->score = 0;
+        this->freq_shot = freq_shot;
 }
 
 void modify_speed(double proportion){
@@ -648,6 +674,7 @@ void new_shot(){
 }
 
 void kinematics(double timeDiference, Window* window, Scenario* scenario) {
+        this->prev_pos = new Point(this->car->body->center->x, this->car->body->center->y);
         this->car->kinematics(timeDiference, window, scenario, this->speed_current);
         for (std::list<Shot *>::const_iterator i = this->shots.begin(); i != this->shots.end(); ++i) {
                 (*i)->kinematics(timeDiference, this->speed_shot);
@@ -661,38 +688,105 @@ void draw(Window* window){
 
 class AI {
 public:
-static void move_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies){
-        std::cout << std::endl;
+static void score(Scenario* scenario, Caracter* player){
+        double linha = scenario->largada->center->y;
+        double coluna_1 = scenario->largada->center->x;
+        double coluna_2 = scenario->largada->center->x + scenario->largada->width;
+        double prev_y = player->prev_pos->y;
+        double x = player->car->body->center->x;
+        double y = player->car->body->center->y;
+
+        if(coluna_1 > coluna_2) {
+                double aux = coluna_1;
+                coluna_1 = coluna_2;
+                coluna_2 = aux;
+        }
+
+        if(x >= coluna_1 && x <= coluna_2) {
+                if(prev_y > linha &&  y < linha) {
+                        player->score += 1;
+                }
+                else if(prev_y < linha &&  y > linha) {
+                        player->score -= 1;
+                }
+        }
+}
+
+static void move_enemy_pid(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies){
         for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
-                (*i)->modify_speed(1);
-                double error = 0;
-                double prev_error = (*i)->car->prev_error;
+                if((*i)->prev_pos->equal((*i)->car->body->center)) {
+                        (*i)->modify_speed(-1);
+                        (*i)->counter = 30;
+                }
+
+                (*i)->counter -= 1;
+
+                if ((*i)->counter == 0) {
+                        (*i)->modify_speed(1);
+                        (*i)->counter = 30;
+                }
+
                 double set_point = ((*i)->car->body->center->vetor(window->center))->angle(); //NOTE must be (0,360)
-                if(error/prev_error < 0) {
-                        error = 10;
+                double error = set_point - (*i)->car->get_angle_body();
+                double dist_error = ((*i)->car->body->center->distance(window->center) - (*i)->set_point)/(*i)->set_point;
+                (*i)->car->i_error += dist_error;
+
+                if(error < 180) {
+                        (*i)->car->modify_angle_wheel(error - (*i)->car->i_error);
                 }
                 else {
-                        error = set_point - (*i)->car->get_angle_body(); //TODO problem with higher speeds
-                        (*i)->car->prev_error = error;
+                        (*i)->car->modify_angle_wheel((-1)*error - (*i)->car->i_error);
                 }
-                cout << set_point << " " << (*i)->car->get_angle_body() << " " << error  << " " << prev_error << endl;
-                (*i)->car->modify_angle_wheel(error);
+        }
+}
+
+static void move_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies){
+        for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
+                (*i)->car->angle_body = ((*i)->car->body->center->vetor(window->center))->angle();
+                (*i)->car->angle_wheel = (-1)*asin(((*i)->car->d)/(*i)->set_point)*(180/PI);
+
+                if((*i)->prev_pos->equal((*i)->car->body->center)) {
+                        (*i)->modify_speed(-1);
+                        (*i)->counter = 30;
+                }
+
+                (*i)->counter -= 1;
+
+                if ((*i)->counter == 0) {
+                        (*i)->modify_speed(1);
+                        (*i)->counter = 30;
+                }
         }
 }
 
 static void shot_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies) {
         for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
-                //cout << ((*i)->car->body->center->vetor(window->center))->angle() << endl;
-                // double angle = player->car->body->center->vetor((*i)->car->body->center)->angle();
-                // cout << (*i)->car->angle_body<< ": " << angle << endl;
-                // if((*i)->car->angle_body - 90 - angle < 45 || (*i)->car->angle_body - 90 - angle > 315) {
-                //         // cout << (-1)*((*i)->car->angle_body - 90 - angle) << endl;
-                //         if((-1)*((*i)->car->angle_body - 90 - angle) < 45 && (-1)*((*i)->car->angle_body - 90 - angle) > -45) {
-                //                 (*i)->car->angle_cannon = (-1)*((*i)->car->angle_body - 90 - angle);
-                //                 (*i)->new_shot();
-                //         }
-                // }
-                //cout <<  (*i)->car->angle_cannon << endl;
+                double car_angle = (*i)->car->get_angle_body() - 90; //NOTE angulo do cado de (0,360)
+                car_angle = car_angle < 0 ? (car_angle + 360) : (car_angle);
+
+                double angle = player->car->body->center->vetor((*i)->car->body->center)->angle();
+
+                if(abs(car_angle - angle) <= 45 || abs(car_angle - angle - 360) <= 45) {
+                        (*i)->car->angle_cannon = angle - car_angle;
+                        (*i)->new_shot();
+                }
+        }
+
+}
+
+static void print_score(char* str, void* font, GLfloat x, GLfloat y, Caracter* player) {
+        //Create a string to be printed
+        char *tmpStr;
+        sprintf(str, "Player 1 Score: %d", player->score);
+        //Define the position to start printing
+        glRasterPos2f(x, y);
+        //Print  the first Char with a certain font
+        //glutBitmapLength(font,(unsigned char*)str);
+        tmpStr = str;
+        //Print each of the other Char at time
+        while( *tmpStr ) {
+                glutBitmapCharacter(font, *tmpStr);
+                tmpStr++;
         }
 }
 };
@@ -701,10 +795,15 @@ static void shot_enemy(double timeDiference, Window* window, Caracter* player, l
 GLfloat gx = 0, gy = 0;
 int keypress[256];
 
+/* Text variable */
+static char str[2000];
+void* font = GLUT_BITMAP_9_BY_15;
+
 Window* window;
 Scenario* scenario;
 Caracter* player;
 list<Caracter *> enemies;
+
 
 list<Shape*> parserCarSVG(const char *svg_car) {
         XMLDocument xml_doc;
@@ -756,12 +855,17 @@ list<Shape*> parserCarSVG(const char *svg_car) {
         return parts;
 }
 
-void parserSVG(const char *svg_img, double speed_car, double speed_shot) {
+//TODO Velocidade diferente para inimigos e Jogador
+//TODO Colisao tiro
+//TODO Colisao carros
+//TODO Exibir cronometro
+//TODO Finalizacao do jogo
+
+void parserSVG(const char *svg_img, double speed_car, double speed_shot, double freqTiro, double velCarro, double velTiro) {
         XMLDocument xml_doc;
         xml_doc.LoadFile(svg_img);
         XMLNode *pRoot  = xml_doc.FirstChild();
         XMLElement *obj = pRoot->FirstChildElement("circle");
-
 
         int counter_arena = 0;
         Circle *arena[2];
@@ -829,12 +933,12 @@ void parserSVG(const char *svg_img, double speed_car, double speed_shot) {
                         player = new Caracter(window, (Circle*)(*i), parts, speed_car, speed_shot);
                 }
                 else {
-                        enemies.push_back(new Caracter(window, (Circle*)(*i), parts, speed_car, speed_shot));
+                        enemies.push_back(new Caracter(window, (Circle*)(*i), parts, velCarro, velTiro, freqTiro));
                 }
         }
 }
 
-string parserXML(const char *path, double* speed_car, double* speed_shot) {
+string parserXML(const char *path, double* speed_car, double* speed_shot, double* freqTiro, double* velCarro, double* velTiro) {
         XMLDocument xml_doc;
         string svg_name, svg_ext, svg_path;
         string file = string(path);
@@ -853,6 +957,12 @@ string parserXML(const char *path, double* speed_car, double* speed_shot) {
         XMLElement *pCarAttr = pRoot->FirstChildElement("carro");
         pCarAttr->QueryDoubleAttribute("velTiro",  speed_shot);
         pCarAttr->QueryDoubleAttribute("velCarro", speed_car);
+
+        XMLElement *pCarEnemyAttr = pRoot->FirstChildElement("carroInimigo");
+        pCarEnemyAttr->QueryDoubleAttribute("freqTiro", freqTiro);
+        pCarEnemyAttr->QueryDoubleAttribute("velCarro", velCarro);
+        pCarEnemyAttr->QueryDoubleAttribute("velTiro", velTiro);
+
         return svg_path + svg_name + "." + svg_ext;
 }
 
@@ -905,7 +1015,7 @@ void idle(void) {
         timeDiference = currentTime - previousTime;
         //Update previous time
         previousTime = currentTime;
-
+        AI::score(scenario, player);
         AI::move_enemy(timeDiference, window, player, enemies);
         AI::shot_enemy(timeDiference, window, player, enemies);
 
@@ -926,6 +1036,7 @@ void display() {
                 (*i)->draw(window);
         }
         player->draw(window);
+        AI::print_score (str, font, 10, 10, player);
         glutSwapBuffers();
 }
 
@@ -936,9 +1047,10 @@ void motion(int x, int y) {
 /* Main function: GLUT runs as a console application starting at main()	*/
 int main(int argc, char **argv) {
 
-        double speed_car, speed_shot;
-        string path = parserXML(argv[1], &speed_car, &speed_shot );
-        parserSVG(path.c_str(), speed_car, speed_shot);
+        double speed_car, speed_shot, freqTiro, velCarro, velTiro;
+        string path = parserXML(argv[1], &speed_car, &speed_shot, &freqTiro, &velCarro, &velTiro );
+        parserSVG(path.c_str(), speed_car, speed_shot, freqTiro, velCarro, velTiro);
+
         // Initialize GLUT Set the window's initial width & height
         glutInit(&argc, argv);
         glutInitDisplayMode (GLUT_DOUBLE);
