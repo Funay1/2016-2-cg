@@ -14,13 +14,23 @@ using namespace std;
 using namespace tinyxml2;
 
 #define PI 3.1415927
+
+/*Type State: used to indicate the state of the caracter */
 typedef enum state {ALIVE, DEAD} State;
 
+/* There is only to types of shapes that can be draw
+    - RECT
+    - CIRCLE
+ */
 typedef enum type {
         RECT,
         CIRCLE
 } Type;
 
+/* Class that represents a point in a 2D space.
+   x - Coordinate x
+   y - Coordinate y
+ */
 class Point {
 public:
 double x;
@@ -31,14 +41,17 @@ Point(double a,
         this->y = b;
 }
 
+/* Clones the current point */
 Point* clone(){
         return new Point(this->x, this->y);
 }
 
+/* Return true if the current point is equal to the given on */
 bool equal(Point* p){
         return (this->x == p->x) && (this->y == p->y);
 }
 
+/* Method tostring of current point */
 string toString(){
         ostringstream convert;
         convert << this->x << ", " << this->y;
@@ -761,7 +774,7 @@ static void move_enemy_pid(double timeDiference, Window* window, Caracter* playe
 static void move_enemy(double timeDiference, Window* window, Caracter* player, list<Caracter *> enemies){
         for (std::list<Caracter*>::iterator i = enemies.begin(); i != enemies.end(); i++) {
                 (*i)->car->angle_body = ((*i)->car->body->center->vetor(window->center))->angle();
-                (*i)->car->angle_wheel = (-1)*asin(((*i)->car->d)/(*i)->set_point)*(180/PI);
+                (*i)->car->angle_wheel = (-1)*asin(((*i)->car->d)*(*i)->car->ratio/(*i)->set_point)*(180/PI);
 
                 if((*i)->prev_pos->equal((*i)->car->body->center)) {
                         (*i)->modify_speed(-1);
@@ -824,7 +837,7 @@ static void print (char* str, void* font, GLfloat x, GLfloat y, Caracter* player
         if(player->state == ALIVE && player->score <= 0) {
                 sprintf(str, "Score: %d", player->score);
         }
-        else if (player->score == 1 || enemies.size() == 0) {
+        else if (player->score == 1) {
                 sprintf(str, "You won");
         }
         else if (player->state == DEAD) {
@@ -843,9 +856,12 @@ static void print (char* str, void* font, GLfloat x, GLfloat y, Caracter* player
                 glutBitmapCharacter(font, *tmpStr);
                 tmpStr++;
         }
-
+        static int time = 0;
         if(player->start_time != 0) {
-                sprintf(str, "Elasped time: %d s", (int)glutGet(GLUT_ELAPSED_TIME)/1000 - (int)player->start_time/1000);
+                if(player->state == ALIVE && player->score <= 0) {
+                        time = (int)glutGet(GLUT_ELAPSED_TIME)/1000;
+                }
+                sprintf(str, "Elasped time: %d s", time - (int)player->start_time/1000);
         }
         else {
                 sprintf(str, "Elasped time: %d s", (int)player->start_time/1000);
@@ -1106,12 +1122,15 @@ void idle(void) {
 void display() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
-        scenario->draw();
-        for (std::list<Caracter *>::iterator i = enemies.begin(); i != enemies.end(); ++i) {
-                (*i)->draw(window);
-        }
-        player->draw(window);
+
         AI::print (str, font, window->center->x - window->width/2 + 20, window->center->y + window->height/2 - 20,  player, enemies);
+        if(player->state == ALIVE && player->score <= 0) {
+                scenario->draw();
+                for (std::list<Caracter *>::iterator i = enemies.begin(); i != enemies.end(); ++i) {
+                        (*i)->draw(window);
+                }
+                player->draw(window);
+        }
         glutSwapBuffers();
 }
 
